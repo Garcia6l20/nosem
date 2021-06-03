@@ -25,15 +25,13 @@ cd build && ninja
 ### Nosem
 
 ```python
-#!/usr/bin/env python
-from nosem import project, executable, main
+from nosem import project, executable
 
 project('myproj', 'cpp')
 executable('example', 'main.cpp')
+```
 
-main()
 ```
-```
-./build.py build
+nosem build
 cd build && ninja
 ```

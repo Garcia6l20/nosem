@@ -16,7 +16,8 @@ def load_module(path):
 
 class Interpreter(interpreter.Interpreter):
     def load_root_meson_file(self) -> None:
-        pass
+        if Project.get_root() is None:
+            load_module(os.path.join(self.environment.source_dir, environment.build_filename))
 
     def sanity_check_ast(self) -> None:
         pass
