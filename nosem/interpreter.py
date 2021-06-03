@@ -1,10 +1,24 @@
 import os
 import importlib.util
 
-from mesonbuild import build, interpreter, mesonlib, environment, mlog
+from mesonbuild import build, interpreter, interpreterbase, mesonlib, environment, mlog
 from mesonbuild.mesonlib import MachineChoice
 
-from .project import Project
+
+class WrapResolver(interpreter.interpreter.wrap.Resolver):
+    """ Overloaded wrap.Resolver
+    """
+
+    def resolve(self, subp_name, method, subproject):
+        intr = Interpreter.get()
+        abs_dir = os.path.join(intr.source_root, subp_name)
+        build_file = os.path.join(abs_dir, environment.build_filename)
+        if os.path.exists(build_file):
+            return subp_name
+        super().resolve(subp_name, method, subproject)
+
+
+interpreter.interpreter.wrap.Resolver = WrapResolver
 
 
 def load_module(path):
@@ -15,34 +29,51 @@ def load_module(path):
 
 
 class Interpreter(interpreter.Interpreter):
+    """ Overloaded Interpreter
+
+    Actualy not an Interpreter, it only loads the nosem-build.py.
+    """
+
+    _current = None
+    _root = None
+
+    def __init__(self, *args, **kwargs):
+        self.parent = Interpreter._current
+        Interpreter._current = self
+
+        if Interpreter._root is None:
+            Interpreter._root = self
+
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def get():
+        return Interpreter._current
+
+    @staticmethod
+    def root():
+        return Interpreter._root
+
     def load_root_meson_file(self) -> None:
-        if Project.get_root() is None:
-            load_module(os.path.join(self.environment.source_dir, environment.build_filename))
+        pass
+
+    def load_root_project(self) -> None:
+        load_module(os.path.join(self.source_root, self.root_subdir, environment.build_filename))
+        if self.parent:
+            Interpreter._current = self.parent
 
     def sanity_check_ast(self) -> None:
         pass
 
-    def build_func_dict(self) -> None:
-        pass
-
     def parse_project(self):
-        root = Project.get_root()
-
-        self.add_languages(root.proj_langs, True, MachineChoice.HOST)
-        self.add_languages(root.proj_langs, False, MachineChoice.BUILD)
-
-        self.set_backend()
-
-        self.build.projects[self.subproject] = root.name
-
-        mlog.log('Project name:', mlog.bold(root.name))
-        mlog.log('Project version:', mlog.bold(root.version or 'undefined'))
-
-        for target in root.targets:
-            build_target = target(self.environment, self.subdir, self.subproject, MachineChoice.HOST)
-            self.add_stdlib_info(build_target)
-            self.add_target(target.name, build_target)
-            self.project_args_frozen = True
+        self.load_root_project()
+        self.project_args_frozen = True
 
     def run(self) -> None:
         pass
+
+
+import mesonbuild
+
+# global override iterpreter
+mesonbuild.interpreter.interpreter.Interpreter = Interpreter

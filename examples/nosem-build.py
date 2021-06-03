@@ -1,3 +1,6 @@
-from nosem import project
+from nosem import project, subproject
 
-project('pyrobuild-examples', 'cpp')
+project('nosem-examples', 'cpp')
+
+subproject('basic')
+subproject('static_library')

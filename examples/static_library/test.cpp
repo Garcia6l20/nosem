@@ -3,5 +3,5 @@
 #include <iostream>
 
 void basic::test(std::string_view who) {
-    std::cout << "Hello " << who << '\n';
+    std::cout << "Hello " << who << "! \n";
 }

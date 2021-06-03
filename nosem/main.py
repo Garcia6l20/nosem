@@ -1,3 +1,4 @@
+import nosem
 from mesonbuild.mesonmain import main
 
 if __name__ == '__main__':

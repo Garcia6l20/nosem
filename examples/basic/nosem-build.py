@@ -1,7 +1,4 @@
-from nosem import project, executable, static_library
+from nosem import project, executable
 
 project('basic', 'cpp')
-
-basic = static_library('basic', 'test.cpp', include_directories=['.'])
-
-executable('basic-demo', 'main.cpp', link_with=[basic])
+executable('basic-demo', 'main.cpp')

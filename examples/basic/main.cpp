@@ -1,6 +1,6 @@
-#include <test.hpp>
+#include <iostream>
 
 int main() {
-    basic::test("nosem");
+    std::cout << "Hello nosem !\n";
     return 0;
 }
