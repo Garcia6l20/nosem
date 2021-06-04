@@ -4,3 +4,4 @@ project('nosem-examples', 'cpp')
 
 subproject('basic')
 subproject('static_library')
+subproject('find_library')

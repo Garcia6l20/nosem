@@ -3,14 +3,13 @@ version = '0.0.1'
 from .interpreter import Interpreter
 
 from mesonbuild import environment, interpreter
+import functools
 
 environment.build_filename = 'nosem-build.py'
 interpreter.Interpreter = Interpreter
 
 
 def __create_unwrapped_funcs():
-    import functools
-
     # list of functions available to nosem-build.py
     funcs = ['add_global_arguments',
              'add_project_arguments',
@@ -74,3 +73,33 @@ def __create_unwrapped_funcs():
 
 
 __create_unwrapped_funcs()
+
+
+def with_meson(func):
+    def wrapper(*args, **kwargs):
+        meson = Interpreter.get().builtin['meson']
+        return func(meson, *args, **kwargs)
+    return wrapper
+
+def meson_method(name):
+    class FakeState:
+        current_node = None
+        subproject = None
+    @with_meson
+    def wrapper(meson, name, *args, **kwargs):
+        method = meson.methods[name]
+        class Wrapper:
+            holder = method(list(args), kwargs)
+            def __getattribute__(self, item):
+                if item in Wrapper.holder.methods:
+                    def wrapper(*args, **kwargs):
+                        FakeState.subproject = Interpreter.get()
+                        return Wrapper.holder.methods[item](list(args), kwargs)
+                    return wrapper
+                else:
+                    return getattr(Wrapper.holder, item)
+        return Wrapper()
+    return functools.partial(wrapper, name)
+
+def __getattr__(name):
+    return meson_method(name)
