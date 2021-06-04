@@ -2,11 +2,38 @@ version = '0.0.1'
 
 from .interpreter import Interpreter
 
-from mesonbuild import environment, interpreter
+from mesonbuild import environment, interpreter, interpreterbase
 import functools
 
 environment.build_filename = 'nosem-build.py'
 interpreter.Interpreter = Interpreter
+
+
+def _unwrap_result(result):
+    class FakeState:
+        current_node = None
+        subproject = None
+
+    if not isinstance(result, interpreterbase.InterpreterObject):
+        return result
+    else:
+        class Wrapper:
+            def __init__(self, holder):
+                self.holder = holder
+
+            def __getattr__(self, item):
+                if hasattr(self.holder, item):
+                    return getattr(self.holder, item)
+                elif item in self.holder.methods:
+                    def wrapper(*args, **kwargs):
+                        FakeState.subproject = Interpreter.get()
+                        return self.holder.methods[item](list(args), kwargs)
+
+                    return wrapper
+                else:
+                    raise ValueError()
+
+        return Wrapper(result)
 
 
 def __create_unwrapped_funcs():
@@ -56,6 +83,7 @@ def __create_unwrapped_funcs():
              'run_command',
              'set_variable',
              'subdir',
+             'subdir_done',
              'subproject',
              'summary',
              'shared_library',
@@ -67,7 +95,7 @@ def __create_unwrapped_funcs():
     for func_name in funcs:
         def unwrapped(fname, *args, **kwargs):
             func = Interpreter.get().funcs[fname]
-            return func(None, list(args), kwargs)
+            return _unwrap_result(func(None, list(args), kwargs))
 
         globals()[func_name] = functools.partial(unwrapped, func_name)
 
@@ -79,27 +107,18 @@ def with_meson(func):
     def wrapper(*args, **kwargs):
         meson = Interpreter.get().builtin['meson']
         return func(meson, *args, **kwargs)
+
     return wrapper
 
+
 def meson_method(name):
-    class FakeState:
-        current_node = None
-        subproject = None
     @with_meson
     def wrapper(meson, name, *args, **kwargs):
         method = meson.methods[name]
-        class Wrapper:
-            holder = method(list(args), kwargs)
-            def __getattribute__(self, item):
-                if item in Wrapper.holder.methods:
-                    def wrapper(*args, **kwargs):
-                        FakeState.subproject = Interpreter.get()
-                        return Wrapper.holder.methods[item](list(args), kwargs)
-                    return wrapper
-                else:
-                    return getattr(Wrapper.holder, item)
-        return Wrapper()
+        return _unwrap_result(method(list(args), kwargs))
+
     return functools.partial(wrapper, name)
+
 
 def __getattr__(name):
     return meson_method(name)

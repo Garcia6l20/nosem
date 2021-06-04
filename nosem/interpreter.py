@@ -72,6 +72,49 @@ class Interpreter(interpreter.Interpreter):
     def run(self) -> None:
         pass
 
+    def func_subdir(self, node, args, kwargs):
+        self.validate_arguments(args, 1, [str])
+        mesonlib.check_direntry_issues(args)
+        if '..' in args[0]:
+            raise InvalidArguments('Subdir contains ..')
+        if self.subdir == '' and args[0] == self.subproject_dir:
+            raise InvalidArguments('Must not go into subprojects dir with subdir(), use subproject() instead.')
+        if self.subdir == '' and args[0].startswith('meson-'):
+            raise InvalidArguments('The "meson-" prefix is reserved and cannot be used for top-level subdir().')
+        for i in mesonlib.extract_as_list(kwargs, 'if_found'):
+            if not hasattr(i, 'found_method'):
+                raise InterpreterException('Object used in if_found does not have a found method.')
+            if not i.found_method([], {}):
+                return
+        prev_subdir = self.subdir
+        subdir = os.path.join(prev_subdir, args[0])
+        if os.path.isabs(subdir):
+            raise InvalidArguments('Subdir argument must be a relative path.')
+        absdir = os.path.join(self.environment.get_source_dir(), subdir)
+        symlinkless_dir = os.path.realpath(absdir)
+        build_file = os.path.join(symlinkless_dir, 'meson.build')
+        if build_file in self.processed_buildfiles:
+            raise InvalidArguments('Tried to enter directory "%s", which has already been visited.'
+                                   % subdir)
+        self.processed_buildfiles.add(build_file)
+        self.subdir = subdir
+        os.makedirs(os.path.join(self.environment.build_dir, subdir), exist_ok=True)
+        buildfilename = os.path.join(self.subdir, environment.build_filename)
+        self.build_def_files.append(buildfilename)
+        absname = os.path.join(self.environment.get_source_dir(), buildfilename)
+        if not os.path.isfile(absname):
+            self.subdir = prev_subdir
+            raise InterpreterException(f"Non-existent build file '{buildfilename!s}'")
+        load_module(absname)
+
+    def set_variable(self, varname: str, variable) -> None:
+        if variable is None:
+            raise InvalidCode('Can not assign None to variable.')
+        self.variables[varname] = variable
+
+    def make_test(self, node, args, kwargs):
+        args[1] = args[1].holder
+        return super().make_test(node, args, kwargs)
 
 import mesonbuild
 
