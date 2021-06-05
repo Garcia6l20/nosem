@@ -5,7 +5,7 @@ from .interpreter import Interpreter
 from mesonbuild import environment, interpreter, interpreterbase
 import functools
 
-environment.build_filename = 'nosem-build.py'
+environment.build_filename = 'nosem.build.py'
 interpreter.Interpreter = Interpreter
 
 

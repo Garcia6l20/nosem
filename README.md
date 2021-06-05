@@ -25,7 +25,7 @@ cd build && ninja
 
 ### Nosem
 
-nosem-build.py:
+nosem.build.py:
 ```python
 from nosem import project, executable
 
@@ -41,7 +41,7 @@ cd build && ninja
 ## API
 
 The API is exactly the same as meson available [here](https://mesonbuild.com/Reference-manual.html).
-It defers only in the syntax, *nosem-build.py* file are pure python.
+It defers only in the syntax, *nosem.build.py* files are pure python.
 
 ## How it works
 
