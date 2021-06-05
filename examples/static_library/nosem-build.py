@@ -1,7 +1,9 @@
-from nosem import project, executable, static_library
+from nosem import project, subdir
 
-project('static_lib', 'cpp')
+project('static_lib', 'cpp',
+    default_options=[
+        'cpp_std=c++latest'
+    ])
 
-lib = static_library('static-lib', 'test.cpp', include_directories=['.'])
-
-executable('static-lib-demo', 'main.cpp', link_with=[lib])
+subdir('testlib')
+subdir('exe')

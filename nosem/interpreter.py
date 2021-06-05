@@ -2,6 +2,7 @@ import os
 import importlib.util
 
 from mesonbuild import build, interpreter, interpreterbase, mesonlib, environment, mlog
+from mesonbuild.interpreterbase import InterpreterException
 from mesonbuild.mesonlib import MachineChoice
 
 
@@ -21,11 +22,9 @@ class WrapResolver(interpreter.interpreter.wrap.Resolver):
 interpreter.interpreter.wrap.Resolver = WrapResolver
 
 
-def load_module(path):
-    spec = importlib.util.spec_from_file_location("meson_user_build", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def get_interpreter_objects(module):
+    from inspect import getmembers
+    return {k: v for k, v in getmembers(module, lambda obj: hasattr(obj, 'holder'))}
 
 
 class Interpreter(interpreter.Interpreter):
@@ -38,6 +37,9 @@ class Interpreter(interpreter.Interpreter):
     _root = None
 
     def __init__(self, *args, **kwargs):
+
+        self.root_module = None
+
         self.parent = Interpreter._current
         Interpreter._current = self
 
@@ -45,6 +47,15 @@ class Interpreter(interpreter.Interpreter):
             Interpreter._root = self
 
         super().__init__(*args, **kwargs)
+
+    def load_module(self, path, is_root=False, **kwargs):
+        spec = importlib.util.spec_from_file_location("meson_user_build", path)
+        module = importlib.util.module_from_spec(spec)
+        if is_root:
+            self.root_module = module
+        module.__dict__.update(**kwargs)
+        spec.loader.exec_module(module)
+        return module
 
     @staticmethod
     def get():
@@ -58,7 +69,7 @@ class Interpreter(interpreter.Interpreter):
         pass
 
     def load_root_project(self) -> None:
-        load_module(os.path.join(self.source_root, self.root_subdir, environment.build_filename))
+        self.load_module(os.path.join(self.source_root, self.root_subdir, environment.build_filename), is_root=True)
         if self.parent:
             Interpreter._current = self.parent
 
@@ -105,7 +116,11 @@ class Interpreter(interpreter.Interpreter):
         if not os.path.isfile(absname):
             self.subdir = prev_subdir
             raise InterpreterException(f"Non-existent build file '{buildfilename!s}'")
-        load_module(absname)
+
+        module = self.load_module(absname, **get_interpreter_objects(self.root_module))
+        self.root_module.__dict__.update(**get_interpreter_objects(module))
+        self.subdir = prev_subdir
+        return module
 
     def set_variable(self, varname: str, variable) -> None:
         if variable is None:
@@ -115,6 +130,7 @@ class Interpreter(interpreter.Interpreter):
     def make_test(self, node, args, kwargs):
         args[1] = args[1].holder
         return super().make_test(node, args, kwargs)
+
 
 import mesonbuild
 
