@@ -12,10 +12,10 @@ class WrapResolver(interpreter.interpreter.wrap.Resolver):
 
     def resolve(self, subp_name, method, subproject):
         intr = Interpreter.get()
-        abs_dir = os.path.join(intr.source_root, subp_name)
+        abs_dir = os.path.join(intr.source_root, self.subdir, subp_name)
         build_file = os.path.join(abs_dir, environment.build_filename)
         if os.path.exists(build_file):
-            return subp_name
+            return os.path.join(self.subdir, subp_name)
         super().resolve(subp_name, method, subproject)
 
 

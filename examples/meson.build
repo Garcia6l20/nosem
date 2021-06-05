@@ -1,8 +1,6 @@
-from nosem import project, subproject, current_build_dir
-
 project('nosem-examples', 'cpp',
-        default_options=[
-            f'pkg_config_path={current_build_dir()}'
+        default_options: [
+            'pkg_config_path=@0@'.format(meson.current_build_dir())
         ])
 
 subproject('basic')
