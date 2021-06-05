@@ -1,7 +1,9 @@
 from nosem import (project, executable, dependency, find_program, run_command, current_source_dir, current_build_dir, \
                    error, test)
 
-project('conan')
+project('conan', default_options=[
+    f'build.pkg_config_path={current_build_dir()}'
+])
 
 conan = find_program('conan', required=False)
 if not conan.found():
@@ -13,6 +15,6 @@ else:
     if result.returncode != 0:
         error(f'conan error: {result.stderr}')
 
-    catch2 = dependency('catch2', required=True, extra_path=build_dir)
+    catch2 = dependency('catch2', required=True)
     demo = executable('conan-demo', 'demo.cpp', dependencies=catch2)
     test('conan-demo', demo)
