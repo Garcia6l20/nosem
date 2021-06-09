@@ -1,4 +1,4 @@
-project('static_lib', 'cpp',
+project('testlib', 'cpp',
         default_options: [
             'cpp_std=c++latest'
         ])

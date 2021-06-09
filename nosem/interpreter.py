@@ -1,8 +1,9 @@
 import os
 import importlib.util
+from re import sub
 
 from mesonbuild import build, interpreter, interpreterbase, mesonlib, environment, mlog
-from mesonbuild.interpreterbase import InterpreterException
+from mesonbuild.interpreterbase import InterpreterException, InvalidArguments, InvalidCode
 from mesonbuild.mesonlib import MachineChoice
 
 
@@ -24,7 +25,8 @@ interpreter.interpreter.wrap.Resolver = WrapResolver
 
 def get_interpreter_objects(module):
     from inspect import getmembers
-    return {k: v for k, v in getmembers(module, lambda obj: hasattr(obj, 'holder'))}
+    wrapped_objects = {k: v for k, v in getmembers(module, lambda obj: hasattr(obj, 'holder'))}
+    return wrapped_objects
 
 
 class Interpreter(interpreter.Interpreter):
@@ -35,10 +37,14 @@ class Interpreter(interpreter.Interpreter):
 
     _current = None
     _root = None
+    _rootModule = None
+    _module_num = 0
 
     def __init__(self, *args, **kwargs):
 
         self.root_module = None
+        self.subdir_module = None
+        self.module = None
 
         self.parent = Interpreter._current
         Interpreter._current = self
@@ -48,14 +54,35 @@ class Interpreter(interpreter.Interpreter):
 
         super().__init__(*args, **kwargs)
 
+    def get_subproject(self, subp_name):
+        subprojects = Interpreter._root.subprojects
+        self.subprojects = subprojects
+        return subprojects[subp_name] if subp_name in subprojects else None
+
+
+    # def get_variable_method(self, args, kwargs):
+    #     varname = args[0]
+    #     mod_dict = self.module.__dict__
+    #     return mod_dict[varname] if varname in mod_dict else None
+
+    # def get_subproject_dep(self, name, display_name, subp_name, varname, kwargs):
+
+
     def load_module(self, path, is_root=False, **kwargs):
-        spec = importlib.util.spec_from_file_location("meson_user_build", path)
-        module = importlib.util.module_from_spec(spec)
+        spec = importlib.util.spec_from_file_location("meson_user_build_" + str(Interpreter._module_num), path)
+        Interpreter._module_num += 1
+        self.module = importlib.util.module_from_spec(spec)
         if is_root:
-            self.root_module = module
-        module.__dict__.update(**kwargs)
-        spec.loader.exec_module(module)
-        return module
+            self.root_module = self.module
+            if not Interpreter._rootModule:
+                Interpreter._rootModule = self.module
+        else:
+            self.subdir_module = self.module
+        self.module.__dict__.update(**kwargs)
+        for name, wrapper in kwargs.items():
+            self.variables[name] = wrapper.holder
+        spec.loader.exec_module(self.module)
+        return self.module
 
     @staticmethod
     def get():
@@ -69,9 +96,15 @@ class Interpreter(interpreter.Interpreter):
         pass
 
     def load_root_project(self) -> None:
-        self.load_module(os.path.join(self.source_root, self.root_subdir, environment.build_filename), is_root=True)
+        absname = os.path.join(self.source_root, self.root_subdir, environment.build_filename)
+        # objects = dict()
+        # if Interpreter._rootModule:
+        #     objects = get_interpreter_objects(Interpreter._rootModule)
+        module = self.load_module(absname, is_root=True)#, **objects)
+        # Interpreter._rootModule.__dict__.update(**get_interpreter_objects(module))
         if self.parent:
             Interpreter._current = self.parent
+        return module
 
     def sanity_check_ast(self) -> None:
         pass
@@ -117,9 +150,15 @@ class Interpreter(interpreter.Interpreter):
             self.subdir = prev_subdir
             raise InterpreterException(f"Non-existent build file '{buildfilename!s}'")
 
-        module = self.load_module(absname, **get_interpreter_objects(self.root_module))
-        self.root_module.__dict__.update(**get_interpreter_objects(module))
+        prev_module = self.subdir_module
+        parent_module = self.subdir_module or self.root_module
+        module = self.load_module(absname, **get_interpreter_objects(parent_module))
+        objects = get_interpreter_objects(module)
+        parent_module.__dict__.update(**objects)
+        for name, wrapper in objects.items():
+            self.variables[name] = wrapper.holder
         self.subdir = prev_subdir
+        self.subdir_module = prev_module
         return module
 
     def set_variable(self, varname: str, variable) -> None:
@@ -136,3 +175,17 @@ import mesonbuild
 
 # global override iterpreter
 mesonbuild.interpreter.interpreter.Interpreter = Interpreter
+
+import mesonbuild.mintro
+
+from pathlib import Path
+
+# build.meson hard coded in mintro
+original_list_targets = mesonbuild.mintro.list_targets
+def list_targets(*args, **kwargs):
+    tlist = original_list_targets(*args, **kwargs)
+    for t in tlist:
+        p = Path(t['defined_in'])
+        t['defined_in'] = str(p.parent / environment.build_filename)
+    return tlist
+mesonbuild.mintro.list_targets = list_targets

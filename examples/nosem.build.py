@@ -5,7 +5,8 @@ project('nosem-examples', 'cpp',
             f'pkg_config_path={current_build_dir()}'
         ])
 
-subproject('basic')
-subproject('static_library')
-subproject('find_library')
-subproject('conan')
+# subproject('basic')
+subproject('testlib')
+subproject('testlib_depends')
+# subproject('find_library')
+# subproject('conan')

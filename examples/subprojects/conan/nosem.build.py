@@ -15,4 +15,4 @@ else:
 
     catch2 = dependency('catch2', required=True)
     demo = executable('conan-demo', 'demo.cpp', dependencies=catch2)
-    test('conan-demo', demo)
+    test(demo.name(), demo)

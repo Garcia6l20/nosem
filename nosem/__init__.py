@@ -4,35 +4,29 @@ from .interpreter import Interpreter
 
 from mesonbuild import environment, interpreter, interpreterbase
 import functools
+from pathlib import Path
 
 environment.build_filename = 'nosem.build.py'
 interpreter.Interpreter = Interpreter
 
+class Wrapper:
+    def __init__(self, holder):
+        self.holder = holder
+
+    def __getattr__(self, item):
+        if hasattr(self.holder, item):
+            return getattr(self.holder, item)
+        elif item in self.holder.methods:
+            def wrapper(*args, **kwargs):
+                return self.holder.methods[item](list(args), kwargs)
+            return wrapper
+        else:
+            raise ValueError()
 
 def _unwrap_result(result):
-    class FakeState:
-        current_node = None
-        subproject = None
-
     if not isinstance(result, interpreterbase.InterpreterObject):
         return result
     else:
-        class Wrapper:
-            def __init__(self, holder):
-                self.holder = holder
-
-            def __getattr__(self, item):
-                if hasattr(self.holder, item):
-                    return getattr(self.holder, item)
-                elif item in self.holder.methods:
-                    def wrapper(*args, **kwargs):
-                        FakeState.subproject = Interpreter.get()
-                        return self.holder.methods[item](list(args), kwargs)
-
-                    return wrapper
-                else:
-                    raise ValueError()
-
         return Wrapper(result)
 
 
@@ -119,6 +113,18 @@ def meson_method(name):
 
     return functools.partial(wrapper, name)
 
+def import_module(filename, **kwargs):
+    import importlib
+    path = Path(filename)
+    if not path.exists():
+        raise FileNotFoundError(filename)
+    spec = importlib.util.spec_from_file_location(path.stem, path.as_posix())
+
+
+    module = importlib.util.module_from_spec(spec)
+    module.__dict__.update(**kwargs)
+    spec.loader.exec_module(module)
+    return Wrapper(module)
 
 def __getattr__(name):
     return meson_method(name)

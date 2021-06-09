@@ -3,7 +3,8 @@ project('nosem-examples', 'cpp',
             'pkg_config_path=@0@'.format(meson.current_build_dir())
         ])
 
-subproject('basic')
-subproject('static_library')
-subproject('find_library')
-subproject('conan')
+# subproject('basic')
+subproject('testlib')
+subproject('testlib_depends')
+# subproject('find_library')
+# subproject('conan')
