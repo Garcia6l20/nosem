@@ -3,3 +3,4 @@ catch2/2.13.4
 
 [generators]
 pkg_config
+cmake_find_package
