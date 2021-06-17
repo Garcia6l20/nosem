@@ -43,6 +43,13 @@ cd build && ninja
 The API is exactly the same as meson available [here](https://mesonbuild.com/Reference-manual.html).
 It defers only in the syntax, *nosem.build.py* files are pure python.
 
+## Installing
+
+Available on Pypi:
+```bash
+python -m pip install nosem
+```
+
 ## How it works
 
 The *meson.build* script interpretation is bypassed, simply replaced by a python module loading.
