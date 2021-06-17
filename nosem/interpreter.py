@@ -97,13 +97,13 @@ class Interpreter(interpreter.Interpreter):
 
     def load_root_project(self) -> None:
         absname = os.path.join(self.source_root, self.root_subdir, environment.build_filename)
-        # objects = dict()
-        # if Interpreter._rootModule:
-        #     objects = get_interpreter_objects(Interpreter._rootModule)
-        module = self.load_module(absname, is_root=True)#, **objects)
-        # Interpreter._rootModule.__dict__.update(**get_interpreter_objects(module))
+        objects = dict()
+        if self.parent:
+            objects = get_interpreter_objects(self.parent.root_module)
+        module = self.load_module(absname, is_root=True, **objects)
         if self.parent:
             Interpreter._current = self.parent
+            self.parent.root_module.__dict__.update(**get_interpreter_objects(module))
         return module
 
     def sanity_check_ast(self) -> None:
@@ -151,10 +151,14 @@ class Interpreter(interpreter.Interpreter):
             raise InterpreterException(f"Non-existent build file '{buildfilename!s}'")
 
         prev_module = self.subdir_module
-        parent_module = self.subdir_module or self.root_module
-        module = self.load_module(absname, **get_interpreter_objects(parent_module))
+        interpreter_objs = get_interpreter_objects(self.root_module)
+        if self.subdir_module:
+            interpreter_objs.update(**get_interpreter_objects(self.subdir_module))
+        module = self.load_module(absname, **interpreter_objs)
         objects = get_interpreter_objects(module)
-        parent_module.__dict__.update(**objects)
+        if self.subdir_module:
+            self.subdir_module.__dict__.update(**objects)
+        self.root_module.__dict__.update(**objects)
         for name, wrapper in objects.items():
             self.variables[name] = wrapper.holder
         self.subdir = prev_subdir
